@@ -95,3 +95,39 @@ export function extractInviteRows(csvText: string): {
 
   return { rows, error: null };
 }
+
+export type ParsedLessonRow = { title: string; description: string };
+
+const TITLE_HEADERS = ["title", "lesson", "lesson title", "name"];
+const DESCRIPTION_HEADERS = ["description", "desc", "notes"];
+
+export function extractLessonRows(csvText: string): {
+  rows: ParsedLessonRow[];
+  error: string | null;
+} {
+  const table = parseCsv(csvText);
+  if (table.length === 0) {
+    return { rows: [], error: "The file is empty." };
+  }
+
+  const header = table[0].map((h) => h.trim().toLowerCase());
+  const titleIdx = header.findIndex((h) => TITLE_HEADERS.includes(h));
+  const descriptionIdx = header.findIndex((h) => DESCRIPTION_HEADERS.includes(h));
+
+  if (titleIdx === -1) {
+    return {
+      rows: [],
+      error: 'The CSV needs a header row with a "title" column.',
+    };
+  }
+
+  const rows: ParsedLessonRow[] = [];
+  for (const line of table.slice(1)) {
+    const title = (line[titleIdx] ?? "").trim();
+    const description = descriptionIdx === -1 ? "" : (line[descriptionIdx] ?? "").trim();
+    if (!title) continue;
+    rows.push({ title, description });
+  }
+
+  return { rows, error: null };
+}

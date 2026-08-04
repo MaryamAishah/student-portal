@@ -89,6 +89,55 @@ export async function updateLessonAction(
   return { error: null };
 }
 
+type BulkLessonResult = { title: string; status: "added" | "error"; message?: string };
+
+export async function bulkAddLessonsAction(
+  courseId: string,
+  rows: { title: string; description: string }[]
+): Promise<{ results: BulkLessonResult[] }> {
+  await requireRole("admin");
+
+  if (!courseId || rows.length === 0) {
+    return { results: [] };
+  }
+
+  const supabase = await createClient();
+  const results: BulkLessonResult[] = [];
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    const title = row.title.trim();
+    const description = row.description.trim();
+
+    if (!title) {
+      results.push({ title: "(blank)", status: "error", message: "Missing title." });
+      continue;
+    }
+    const key = title.toLowerCase();
+    if (seen.has(key)) {
+      results.push({ title, status: "error", message: "Duplicate in this file." });
+      continue;
+    }
+    seen.add(key);
+
+    const { error } = await supabase.from("lessons").insert({
+      course_id: courseId,
+      title,
+      description: description || null,
+    });
+
+    if (error) {
+      const message = error.code === "23505" ? "A lesson with this title already exists." : error.message;
+      results.push({ title, status: "error", message });
+    } else {
+      results.push({ title, status: "added" });
+    }
+  }
+
+  revalidatePath(`/admin/courses/${courseId}`);
+  return { results };
+}
+
 export async function deleteLessonAction(lessonId: string, courseId: string) {
   await requireRole("admin");
   const supabase = await createClient();

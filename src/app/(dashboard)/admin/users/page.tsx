@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 
-type Profile = { id: string; full_name: string; created_at: string };
+type Profile = { id: string; full_name: string; email: string | null; created_at: string };
 
 function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string }) {
   if (users.length === 0) {
@@ -23,6 +23,7 @@ function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
+          <TableHead>Email</TableHead>
           <TableHead>Created</TableHead>
         </TableRow>
       </TableHeader>
@@ -32,6 +33,11 @@ function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string
             <TableCell className="p-0">
               <Link href={`/admin/users/${u.id}`} className="block px-4 py-3 font-medium">
                 {u.full_name}
+              </Link>
+            </TableCell>
+            <TableCell className="p-0">
+              <Link href={`/admin/users/${u.id}`} className="block px-4 py-3 text-muted-foreground">
+                {u.email ?? "—"}
               </Link>
             </TableCell>
             <TableCell className="p-0">
@@ -50,7 +56,7 @@ export default async function UsersPage() {
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, role, created_at")
+    .select("id, full_name, email, role, created_at")
     .order("full_name", { ascending: true });
 
   const all = profiles ?? [];

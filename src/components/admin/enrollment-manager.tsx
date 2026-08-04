@@ -9,13 +9,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { enrollStudentAction, removeEnrollmentAction } from "@/lib/actions/admin-actions";
 import type { ActionResult } from "@/lib/actions/auth-actions";
 
 const initialState: ActionResult = { error: null };
 
-type Student = { id: string; full_name: string };
+type Student = { id: string; full_name: string; enrolledAt: string };
 
 export function EnrollmentManager({
   courseId,
@@ -24,27 +31,47 @@ export function EnrollmentManager({
 }: {
   courseId: string;
   enrolledStudents: Student[];
-  availableStudents: Student[];
+  availableStudents: { id: string; full_name: string }[];
 }) {
   const [state, formAction, pending] = useActionState(enrollStudentAction, initialState);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {enrolledStudents.length === 0 && (
-          <p className="text-sm text-muted-foreground">No students enrolled yet.</p>
-        )}
-        {enrolledStudents.map((s) => (
-          <Badge key={s.id} variant="secondary" className="gap-2 py-1.5">
-            {s.full_name}
-            <form action={removeEnrollmentAction.bind(null, courseId, s.id)}>
-              <button type="submit" className="text-muted-foreground hover:text-destructive" aria-label={`Remove ${s.full_name}`}>
-                ×
-              </button>
-            </form>
-          </Badge>
-        ))}
-      </div>
+      {enrolledStudents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No students enrolled yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Enrolled</TableHead>
+              <TableHead className="w-px" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {enrolledStudents.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell className="font-medium">{s.full_name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(s.enrolledAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <form action={removeEnrollmentAction.bind(null, courseId, s.id)}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  </form>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {availableStudents.length > 0 && (
         <form action={formAction} className="flex items-end gap-2">

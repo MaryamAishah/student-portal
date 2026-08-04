@@ -9,13 +9,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { assignTeacherAction, removeTeacherAction } from "@/lib/actions/admin-actions";
 import type { ActionResult } from "@/lib/actions/auth-actions";
 
 const initialState: ActionResult = { error: null };
 
-type Teacher = { id: string; full_name: string };
+type Teacher = { id: string; full_name: string; assignedAt: string };
 
 export function TeacherAssignmentManager({
   courseId,
@@ -24,27 +31,47 @@ export function TeacherAssignmentManager({
 }: {
   courseId: string;
   assignedTeachers: Teacher[];
-  availableTeachers: Teacher[];
+  availableTeachers: { id: string; full_name: string }[];
 }) {
   const [state, formAction, pending] = useActionState(assignTeacherAction, initialState);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {assignedTeachers.length === 0 && (
-          <p className="text-sm text-muted-foreground">No teachers assigned yet.</p>
-        )}
-        {assignedTeachers.map((t) => (
-          <Badge key={t.id} variant="secondary" className="gap-2 py-1.5">
-            {t.full_name}
-            <form action={removeTeacherAction.bind(null, courseId, t.id)}>
-              <button type="submit" className="text-muted-foreground hover:text-destructive" aria-label={`Remove ${t.full_name}`}>
-                ×
-              </button>
-            </form>
-          </Badge>
-        ))}
-      </div>
+      {assignedTeachers.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No teachers assigned yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Assigned</TableHead>
+              <TableHead className="w-px" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {assignedTeachers.map((t) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">{t.full_name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(t.assignedAt).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  <form action={removeTeacherAction.bind(null, courseId, t.id)}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      Remove
+                    </Button>
+                  </form>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       {availableTeachers.length > 0 && (
         <form action={formAction} className="flex items-end gap-2">

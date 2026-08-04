@@ -7,6 +7,7 @@ export type Database = {
         Row: {
           id: string;
           full_name: string;
+          email: string | null;
           role: UserRole;
           must_change_password: boolean;
           created_at: string;
