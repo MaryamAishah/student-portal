@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 type Status = "checking" | "ready" | "invalid" | "saving" | "done";
+type EmailOtpType = "recovery" | "invite" | "signup" | "email_change" | "magiclink" | "email";
 
 function readAuthError(): string | null {
   if (typeof window === "undefined") return null;
   const fromQuery = new URLSearchParams(window.location.search);
   const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  const description =
-    fromQuery.get("error_description") ?? fromHash.get("error_description");
+  const description = fromQuery.get("error_description") ?? fromHash.get("error_description");
   const code = fromQuery.get("error_code") ?? fromHash.get("error_code");
   const error = fromQuery.get("error") ?? fromHash.get("error");
 
@@ -26,14 +27,24 @@ function readAuthError(): string | null {
   return null;
 }
 
-export default function ResetPasswordPage() {
-  const [status, setStatus] = useState<Status>("checking");
+function ResetPasswordForm() {
+  const searchParams = useSearchParams();
+  const tokenHash = searchParams.get("token_hash");
+  const otpType = (searchParams.get("type") as EmailOtpType | null) ?? "recovery";
+
+  const [status, setStatus] = useState<Status>(tokenHash ? "ready" : "checking");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
+  // Legacy fallback: links generated before the email templates were
+  // switched to the explicit token_hash flow rely on Supabase's
+  // detectSessionInUrl auto-processing instead. Skipped entirely when
+  // token_hash is present, since that flow verifies on submit instead.
   useEffect(() => {
+    if (tokenHash) return;
+
     const urlError = readAuthError();
     if (urlError) {
       setLinkError(urlError);
@@ -63,7 +74,7 @@ export default function ResetPasswordPage() {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, []);
+  }, [tokenHash]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +91,21 @@ export default function ResetPasswordPage() {
 
     setStatus("saving");
     const supabase = createClient();
+
+    // Redeem the single-use token only now, on genuine user submission —
+    // never automatically on page load — so an email client or security
+    // scanner pre-fetching the link can't burn it before the real click.
+    if (tokenHash) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType,
+      });
+      if (verifyError) {
+        setLinkError(verifyError.message);
+        setStatus("invalid");
+        return;
+      }
+    }
 
     const { error: updateError, data } = await supabase.auth.updateUser({ password });
     if (updateError) {
@@ -112,9 +138,7 @@ export default function ResetPasswordPage() {
         <CardHeader>
           <CardTitle>Link expired or invalid</CardTitle>
           <CardDescription>
-            {linkError
-              ? linkError
-              : "This password reset link no longer works. Request a new one to continue."}
+            {linkError ?? "This password reset link no longer works. Request a new one to continue."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -168,5 +192,13 @@ export default function ResetPasswordPage() {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
