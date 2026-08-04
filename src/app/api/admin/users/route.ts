@@ -22,14 +22,32 @@ export async function POST(request: Request) {
   const adminClient = createAdminClient();
   const { origin } = new URL(request.url);
 
-  const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName, role },
-    redirectTo: `${origin}/reset-password`,
-  });
+  try {
+    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName, role },
+      redirectTo: `${origin}/reset-password`,
+    });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) {
+      console.error(
+        "[invite] Supabase error:",
+        JSON.stringify(error, Object.getOwnPropertyNames(error))
+      );
+      return NextResponse.json(
+        { error: error.message || `Invite failed (status ${error.status ?? "unknown"}).` },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ invited: true });
+  } catch (err) {
+    console.error(
+      "[invite] Threw:",
+      err instanceof Error ? JSON.stringify(err, Object.getOwnPropertyNames(err)) : err
+    );
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Unexpected error sending the invite." },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ invited: true });
 }

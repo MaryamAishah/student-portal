@@ -30,12 +30,12 @@ function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string
         {users.map((u) => (
           <TableRow key={u.id} className="cursor-pointer">
             <TableCell className="p-0">
-              <Link href={`/admin/users/${u.id}`} className="block px-2 py-2 font-medium">
+              <Link href={`/admin/users/${u.id}`} className="block px-4 py-3 font-medium">
                 {u.full_name}
               </Link>
             </TableCell>
             <TableCell className="p-0">
-              <Link href={`/admin/users/${u.id}`} className="block px-2 py-2 text-muted-foreground">
+              <Link href={`/admin/users/${u.id}`} className="block px-4 py-3 text-muted-foreground">
                 {new Date(u.created_at).toLocaleDateString()}
               </Link>
             </TableCell>
