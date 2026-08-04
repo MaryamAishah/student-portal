@@ -10,13 +10,37 @@ import { Button } from "@/components/ui/button";
 
 type Status = "checking" | "ready" | "invalid" | "saving" | "done";
 
+function readAuthError(): string | null {
+  if (typeof window === "undefined") return null;
+  const fromQuery = new URLSearchParams(window.location.search);
+  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const description =
+    fromQuery.get("error_description") ?? fromHash.get("error_description");
+  const code = fromQuery.get("error_code") ?? fromHash.get("error_code");
+  const error = fromQuery.get("error") ?? fromHash.get("error");
+
+  if (description || code || error) {
+    console.error("[reset-password] auth error in URL:", { error, code, description });
+    return description?.replace(/\+/g, " ") ?? code ?? error;
+  }
+  return null;
+}
+
 export default function ResetPasswordPage() {
   const [status, setStatus] = useState<Status>("checking");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
+    const urlError = readAuthError();
+    if (urlError) {
+      setLinkError(urlError);
+      setStatus("invalid");
+      return;
+    }
+
     const supabase = createClient();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -33,7 +57,7 @@ export default function ResetPasswordPage() {
 
     const timeout = setTimeout(() => {
       setStatus((prev) => (prev === "checking" ? "invalid" : prev));
-    }, 3000);
+    }, 5000);
 
     return () => {
       subscription.unsubscribe();
@@ -88,7 +112,9 @@ export default function ResetPasswordPage() {
         <CardHeader>
           <CardTitle>Link expired or invalid</CardTitle>
           <CardDescription>
-            This password reset link no longer works. Request a new one to continue.
+            {linkError
+              ? linkError
+              : "This password reset link no longer works. Request a new one to continue."}
           </CardDescription>
         </CardHeader>
         <CardContent>
