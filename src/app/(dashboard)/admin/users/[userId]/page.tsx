@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ResendInviteButton } from "@/components/admin/resend-invite-button";
 
 type NormalizedRecord = {
   id: string;
@@ -45,7 +46,7 @@ export default async function UserDetailPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, full_name, role, created_at")
+    .select("id, full_name, role, created_at, must_change_password")
     .eq("id", userId)
     .single();
 
@@ -119,16 +120,26 @@ export default async function UserDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{profile.full_name}</h1>
-          <p className="text-sm text-muted-foreground">
-            Joined {new Date(profile.created_at).toLocaleDateString()}
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">{profile.full_name}</h1>
+            <p className="text-sm text-muted-foreground">
+              Joined {new Date(profile.created_at).toLocaleDateString()}
+            </p>
+          </div>
+          <Badge variant={profile.role === "admin" ? "default" : "secondary"} className="capitalize">
+            {profile.role}
+          </Badge>
+          {profile.role !== "admin" && profile.must_change_password && (
+            <Badge variant="outline" className="text-muted-foreground">
+              Invite pending
+            </Badge>
+          )}
         </div>
-        <Badge variant={profile.role === "admin" ? "default" : "secondary"} className="capitalize">
-          {profile.role}
-        </Badge>
+        {profile.role !== "admin" && profile.must_change_password && (
+          <ResendInviteButton userId={profile.id} />
+        )}
       </div>
 
       {profile.role === "admin" ? (

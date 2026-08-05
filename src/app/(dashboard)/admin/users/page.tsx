@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -11,7 +12,13 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 
-type Profile = { id: string; full_name: string; email: string | null; created_at: string };
+type Profile = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  created_at: string;
+  must_change_password: boolean;
+};
 
 function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string }) {
   if (users.length === 0) {
@@ -31,8 +38,16 @@ function UserTable({ users, emptyLabel }: { users: Profile[]; emptyLabel: string
         {users.map((u) => (
           <TableRow key={u.id} className="cursor-pointer">
             <TableCell className="p-0">
-              <Link href={`/admin/users/${u.id}`} className="block px-4 py-3 font-medium">
+              <Link
+                href={`/admin/users/${u.id}`}
+                className="flex items-center gap-2 px-4 py-3 font-medium"
+              >
                 {u.full_name}
+                {u.must_change_password && (
+                  <Badge variant="outline" className="text-muted-foreground">
+                    Pending
+                  </Badge>
+                )}
               </Link>
             </TableCell>
             <TableCell className="p-0">
@@ -56,7 +71,7 @@ export default async function UsersPage() {
   const supabase = await createClient();
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, created_at")
+    .select("id, full_name, email, role, created_at, must_change_password")
     .order("full_name", { ascending: true });
 
   const all = profiles ?? [];
