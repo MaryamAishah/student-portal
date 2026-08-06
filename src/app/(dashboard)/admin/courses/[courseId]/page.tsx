@@ -1,12 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LessonForm } from "@/components/admin/lesson-form";
 import { LessonActions } from "@/components/admin/lesson-actions";
 import { BulkLessonUpload } from "@/components/admin/bulk-lesson-upload";
-import { TeacherAssignmentManager } from "@/components/admin/teacher-assignment-manager";
-import { EnrollmentManager } from "@/components/admin/enrollment-manager";
+import { GroupForm } from "@/components/admin/group-form";
 import { EmptyState } from "@/components/shared/empty-state";
 
 export default async function CourseDetailPage({
@@ -20,8 +20,7 @@ export default async function CourseDetailPage({
   const [
     { data: course },
     { data: lessons },
-    { data: allTeachers },
-    { data: allStudents },
+    { data: groups },
     { data: courseTeachers },
     { data: enrollments },
   ] = await Promise.all([
@@ -31,27 +30,27 @@ export default async function CourseDetailPage({
       .select("id, title, description")
       .eq("course_id", courseId)
       .order("sort_order", { ascending: true }),
-    supabase.from("profiles").select("id, full_name").eq("role", "teacher"),
-    supabase.from("profiles").select("id, full_name").eq("role", "student"),
-    supabase.from("course_teachers").select("teacher_id, created_at").eq("course_id", courseId),
-    supabase.from("enrollments").select("student_id, enrolled_at").eq("course_id", courseId),
+    supabase
+      .from("course_groups")
+      .select("id, name, created_at")
+      .eq("course_id", courseId)
+      .order("name", { ascending: true }),
+    supabase.from("course_teachers").select("group_id").eq("course_id", courseId),
+    supabase.from("enrollments").select("group_id").eq("course_id", courseId),
   ]);
 
   if (!course) {
     notFound();
   }
 
-  const teacherAssignedAt = new Map((courseTeachers ?? []).map((t) => [t.teacher_id, t.created_at]));
-  const studentEnrolledAt = new Map((enrollments ?? []).map((e) => [e.student_id, e.enrolled_at]));
-
-  const assignedTeachers = (allTeachers ?? [])
-    .filter((t) => teacherAssignedAt.has(t.id))
-    .map((t) => ({ ...t, assignedAt: teacherAssignedAt.get(t.id)! }));
-  const availableTeachers = (allTeachers ?? []).filter((t) => !teacherAssignedAt.has(t.id));
-  const enrolledStudents = (allStudents ?? [])
-    .filter((s) => studentEnrolledAt.has(s.id))
-    .map((s) => ({ ...s, enrolledAt: studentEnrolledAt.get(s.id)! }));
-  const availableStudents = (allStudents ?? []).filter((s) => !studentEnrolledAt.has(s.id));
+  const teacherCountByGroup = new Map<string, number>();
+  for (const t of courseTeachers ?? []) {
+    teacherCountByGroup.set(t.group_id, (teacherCountByGroup.get(t.group_id) ?? 0) + 1);
+  }
+  const studentCountByGroup = new Map<string, number>();
+  for (const e of enrollments ?? []) {
+    studentCountByGroup.set(e.group_id, (studentCountByGroup.get(e.group_id) ?? 0) + 1);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,8 +62,7 @@ export default async function CourseDetailPage({
       <Tabs defaultValue="lessons">
         <TabsList>
           <TabsTrigger value="lessons">Lessons</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers</TabsTrigger>
-          <TabsTrigger value="enrollments">Enrollments</TabsTrigger>
+          <TabsTrigger value="groups">Groups</TabsTrigger>
         </TabsList>
 
         <TabsContent value="lessons" className="flex flex-col gap-4">
@@ -97,20 +95,40 @@ export default async function CourseDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="teachers">
-          <TeacherAssignmentManager
-            courseId={courseId}
-            assignedTeachers={assignedTeachers}
-            availableTeachers={availableTeachers}
-          />
-        </TabsContent>
+        <TabsContent value="groups" className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Teachers and students are assigned to a group, not the course directly. Lessons
+              above are shared across every group.
+            </p>
+            <GroupForm courseId={courseId} />
+          </div>
 
-        <TabsContent value="enrollments">
-          <EnrollmentManager
-            courseId={courseId}
-            enrolledStudents={enrolledStudents}
-            availableStudents={availableStudents}
-          />
+          {!groups || groups.length === 0 ? (
+            <EmptyState
+              title="No groups yet"
+              description="Create a group to start assigning teachers and enrolling students."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {groups.map((group) => (
+                <Link key={group.id} href={`/admin/courses/${courseId}/groups/${group.id}`}>
+                  <Card className="h-full transition-all hover:-translate-y-0.5 hover:bg-accent/50 hover:shadow-md">
+                    <CardHeader>
+                      <CardTitle>{group.name}</CardTitle>
+                      <CardDescription>
+                        {teacherCountByGroup.get(group.id) ?? 0} teacher
+                        {(teacherCountByGroup.get(group.id) ?? 0) === 1 ? "" : "s"} ·{" "}
+                        {studentCountByGroup.get(group.id) ?? 0} student
+                        {(studentCountByGroup.get(group.id) ?? 0) === 1 ? "" : "s"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent />
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -15,7 +15,7 @@ export default async function RosterPage({
 
   const { data: assignment } = await supabase
     .from("course_teachers")
-    .select("course_id")
+    .select("course_id, group_id, course_groups(name)")
     .eq("course_id", courseId)
     .eq("teacher_id", profile!.id)
     .maybeSingle();
@@ -34,7 +34,8 @@ export default async function RosterPage({
     supabase
       .from("enrollments")
       .select("profiles(id, full_name)")
-      .eq("course_id", courseId),
+      .eq("course_id", courseId)
+      .eq("group_id", assignment.group_id),
   ]);
 
   const students = (enrollments ?? [])
@@ -47,6 +48,9 @@ export default async function RosterPage({
       <div>
         <h1 className="text-2xl font-semibold">{course?.name}</h1>
         <p className="text-sm text-muted-foreground">
+          {assignment.course_groups?.name && (
+            <span className="font-medium text-foreground">{assignment.course_groups.name} · </span>
+          )}
           Pick a lesson and date, then enter marks and feedback for the class.
         </p>
       </div>
@@ -54,7 +58,7 @@ export default async function RosterPage({
       {!lessons || lessons.length === 0 ? (
         <EmptyState title="No lessons yet" description="Ask an admin to add lessons to this course." />
       ) : students.length === 0 ? (
-        <EmptyState title="No students enrolled" description="Ask an admin to enroll students in this course." />
+        <EmptyState title="No students enrolled" description="Ask an admin to enroll students in your group." />
       ) : (
         <RosterGrid courseId={courseId} lessons={lessons} students={students} />
       )}

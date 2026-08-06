@@ -145,32 +145,92 @@ export async function deleteLessonAction(lessonId: string, courseId: string) {
   revalidatePath(`/admin/courses/${courseId}`);
 }
 
-export async function assignTeacherAction(
+export async function createGroupAction(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
   await requireRole("admin");
   const courseId = String(formData.get("courseId") ?? "");
-  const teacherId = String(formData.get("teacherId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
 
-  if (!courseId || !teacherId) {
-    return { error: "Select a teacher." };
+  if (!courseId || !name) {
+    return { error: "Group name is required." };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("course_teachers")
-    .insert({ course_id: courseId, teacher_id: teacherId });
+  const { error } = await supabase.from("course_groups").insert({ course_id: courseId, name });
 
   if (error) {
-    return { error: error.message };
+    const message = error.code === "23505" ? "A group with this name already exists." : error.message;
+    return { error: message };
   }
 
   revalidatePath(`/admin/courses/${courseId}`);
   return { error: null };
 }
 
-export async function removeTeacherAction(courseId: string, teacherId: string) {
+export async function updateGroupAction(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireRole("admin");
+  const groupId = String(formData.get("groupId") ?? "");
+  const courseId = String(formData.get("courseId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!groupId || !name) {
+    return { error: "Group name is required." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("course_groups").update({ name }).eq("id", groupId);
+
+  if (error) {
+    const message = error.code === "23505" ? "A group with this name already exists." : error.message;
+    return { error: message };
+  }
+
+  revalidatePath(`/admin/courses/${courseId}`);
+  revalidatePath(`/admin/courses/${courseId}/groups/${groupId}`);
+  return { error: null };
+}
+
+export async function deleteGroupAction(groupId: string, courseId: string) {
+  await requireRole("admin");
+  const supabase = await createClient();
+  await supabase.from("course_groups").delete().eq("id", groupId);
+  revalidatePath(`/admin/courses/${courseId}`);
+}
+
+export async function assignTeacherAction(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireRole("admin");
+  const courseId = String(formData.get("courseId") ?? "");
+  const groupId = String(formData.get("groupId") ?? "");
+  const teacherId = String(formData.get("teacherId") ?? "");
+
+  if (!courseId || !groupId || !teacherId) {
+    return { error: "Select a teacher." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("course_teachers")
+    .insert({ course_id: courseId, group_id: groupId, teacher_id: teacherId });
+
+  if (error) {
+    const message =
+      error.code === "23505" ? "This teacher is already assigned to a group in this course." : error.message;
+    return { error: message };
+  }
+
+  revalidatePath(`/admin/courses/${courseId}/groups/${groupId}`);
+  return { error: null };
+}
+
+export async function removeTeacherAction(courseId: string, groupId: string, teacherId: string) {
   await requireRole("admin");
   const supabase = await createClient();
   await supabase
@@ -179,7 +239,7 @@ export async function removeTeacherAction(courseId: string, teacherId: string) {
     .eq("course_id", courseId)
     .eq("teacher_id", teacherId);
 
-  revalidatePath(`/admin/courses/${courseId}`);
+  revalidatePath(`/admin/courses/${courseId}/groups/${groupId}`);
 }
 
 export async function enrollStudentAction(
@@ -188,26 +248,29 @@ export async function enrollStudentAction(
 ): Promise<ActionResult> {
   await requireRole("admin");
   const courseId = String(formData.get("courseId") ?? "");
+  const groupId = String(formData.get("groupId") ?? "");
   const studentId = String(formData.get("studentId") ?? "");
 
-  if (!courseId || !studentId) {
+  if (!courseId || !groupId || !studentId) {
     return { error: "Select a student." };
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("enrollments")
-    .insert({ course_id: courseId, student_id: studentId });
+    .insert({ course_id: courseId, group_id: groupId, student_id: studentId });
 
   if (error) {
-    return { error: error.message };
+    const message =
+      error.code === "23505" ? "This student is already enrolled in a group in this course." : error.message;
+    return { error: message };
   }
 
-  revalidatePath(`/admin/courses/${courseId}`);
+  revalidatePath(`/admin/courses/${courseId}/groups/${groupId}`);
   return { error: null };
 }
 
-export async function removeEnrollmentAction(courseId: string, studentId: string) {
+export async function removeEnrollmentAction(courseId: string, groupId: string, studentId: string) {
   await requireRole("admin");
   const supabase = await createClient();
   await supabase
@@ -216,7 +279,7 @@ export async function removeEnrollmentAction(courseId: string, studentId: string
     .eq("course_id", courseId)
     .eq("student_id", studentId);
 
-  revalidatePath(`/admin/courses/${courseId}`);
+  revalidatePath(`/admin/courses/${courseId}/groups/${groupId}`);
 }
 
 export async function deleteCourseAction(courseId: string) {

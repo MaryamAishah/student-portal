@@ -26,10 +26,12 @@ type Student = { id: string; full_name: string; enrolledAt: string };
 
 export function EnrollmentManager({
   courseId,
+  groupId,
   enrolledStudents,
   availableStudents,
 }: {
   courseId: string;
+  groupId: string;
   enrolledStudents: Student[];
   availableStudents: { id: string; full_name: string }[];
 }) {
@@ -56,7 +58,7 @@ export function EnrollmentManager({
                   {new Date(s.enrolledAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <form action={removeEnrollmentAction.bind(null, courseId, s.id)}>
+                  <form action={removeEnrollmentAction.bind(null, courseId, groupId, s.id)}>
                     <Button
                       type="submit"
                       variant="ghost"
@@ -76,6 +78,7 @@ export function EnrollmentManager({
       {availableStudents.length > 0 && (
         <form action={formAction} className="flex items-end gap-2">
           <input type="hidden" name="courseId" value={courseId} />
+          <input type="hidden" name="groupId" value={groupId} />
           <div className="flex-1">
             <Select
               name="studentId"

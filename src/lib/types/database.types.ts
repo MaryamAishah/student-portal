@@ -70,13 +70,42 @@ export type Database = {
           },
         ];
       };
+      course_groups: {
+        Row: {
+          id: string;
+          course_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["course_groups"]["Row"]> & {
+          course_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["course_groups"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "course_groups_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       course_teachers: {
         Row: {
           course_id: string;
+          group_id: string;
           teacher_id: string;
           created_at: string;
         };
-        Insert: { course_id: string; teacher_id: string; created_at?: string };
+        Insert: {
+          course_id: string;
+          group_id: string;
+          teacher_id: string;
+          created_at?: string;
+        };
         Update: Partial<Database["public"]["Tables"]["course_teachers"]["Row"]>;
         Relationships: [
           {
@@ -84,6 +113,13 @@ export type Database = {
             columns: ["course_id"];
             isOneToOne: false;
             referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "course_teachers_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "course_groups";
             referencedColumns: ["id"];
           },
           {
@@ -98,10 +134,16 @@ export type Database = {
       enrollments: {
         Row: {
           course_id: string;
+          group_id: string;
           student_id: string;
           enrolled_at: string;
         };
-        Insert: { course_id: string; student_id: string; enrolled_at?: string };
+        Insert: {
+          course_id: string;
+          group_id: string;
+          student_id: string;
+          enrolled_at?: string;
+        };
         Update: Partial<Database["public"]["Tables"]["enrollments"]["Row"]>;
         Relationships: [
           {
@@ -109,6 +151,13 @@ export type Database = {
             columns: ["course_id"];
             isOneToOne: false;
             referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "enrollments_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "course_groups";
             referencedColumns: ["id"];
           },
           {
@@ -177,6 +226,10 @@ export type Database = {
         Returns: boolean;
       };
       is_enrolled: {
+        Args: { p_course_id: string; p_student_id: string };
+        Returns: boolean;
+      };
+      shares_group_with_student: {
         Args: { p_course_id: string; p_student_id: string };
         Returns: boolean;
       };

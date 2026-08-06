@@ -26,10 +26,12 @@ type Teacher = { id: string; full_name: string; assignedAt: string };
 
 export function TeacherAssignmentManager({
   courseId,
+  groupId,
   assignedTeachers,
   availableTeachers,
 }: {
   courseId: string;
+  groupId: string;
   assignedTeachers: Teacher[];
   availableTeachers: { id: string; full_name: string }[];
 }) {
@@ -56,7 +58,7 @@ export function TeacherAssignmentManager({
                   {new Date(t.assignedAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell>
-                  <form action={removeTeacherAction.bind(null, courseId, t.id)}>
+                  <form action={removeTeacherAction.bind(null, courseId, groupId, t.id)}>
                     <Button
                       type="submit"
                       variant="ghost"
@@ -76,6 +78,7 @@ export function TeacherAssignmentManager({
       {availableTeachers.length > 0 && (
         <form action={formAction} className="flex items-end gap-2">
           <input type="hidden" name="courseId" value={courseId} />
+          <input type="hidden" name="groupId" value={groupId} />
           <div className="flex-1">
             <Select
               name="teacherId"

@@ -10,12 +10,12 @@ export default async function TeacherCoursesPage() {
 
   const { data: assignments } = await supabase
     .from("course_teachers")
-    .select("courses(id, name, description)")
+    .select("courses(id, name, description), course_groups(name)")
     .eq("teacher_id", profile!.id);
 
   const courses = (assignments ?? [])
-    .map((a) => a.courses)
-    .filter((c): c is { id: string; name: string; description: string | null } => c !== null);
+    .filter((a) => a.courses !== null)
+    .map((a) => ({ ...a.courses!, groupName: a.course_groups?.name ?? null }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -41,9 +41,11 @@ export default async function TeacherCoursesPage() {
               <Card className="h-full transition-all hover:-translate-y-0.5 hover:bg-accent/50 hover:shadow-md">
                 <CardHeader>
                   <CardTitle>{course.name}</CardTitle>
-                  {course.description && (
-                    <CardDescription className="line-clamp-2">{course.description}</CardDescription>
-                  )}
+                  <CardDescription>
+                    {course.groupName && <span className="font-medium text-foreground">{course.groupName}</span>}
+                    {course.groupName && course.description && " · "}
+                    {course.description && <span className="line-clamp-2">{course.description}</span>}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent />
               </Card>
