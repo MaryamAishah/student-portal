@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth/guards";
 import type { ActionResult } from "@/lib/actions/auth-actions";
@@ -286,5 +285,5 @@ export async function deleteCourseAction(courseId: string) {
   await requireRole("admin");
   const supabase = await createClient();
   await supabase.from("courses").delete().eq("id", courseId);
-  redirect("/admin/courses");
+  revalidatePath("/admin/courses");
 }

@@ -7,6 +7,7 @@ import { LessonForm } from "@/components/admin/lesson-form";
 import { LessonActions } from "@/components/admin/lesson-actions";
 import { BulkLessonUpload } from "@/components/admin/bulk-lesson-upload";
 import { GroupForm } from "@/components/admin/group-form";
+import { CourseActions } from "@/components/admin/course-actions";
 import { EmptyState } from "@/components/shared/empty-state";
 
 export default async function CourseDetailPage({
@@ -54,9 +55,12 @@ export default async function CourseDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{course.name}</h1>
-        {course.description && <p className="text-sm text-muted-foreground">{course.description}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{course.name}</h1>
+          {course.description && <p className="text-sm text-muted-foreground">{course.description}</p>}
+        </div>
+        <CourseActions course={course} />
       </div>
 
       <Tabs defaultValue="lessons">
