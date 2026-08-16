@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ResendInviteButton } from "@/components/admin/resend-invite-button";
+import { DownloadCsvButton } from "@/components/shared/download-csv-button";
+import { toCsv } from "@/lib/csv";
 
 type NormalizedRecord = {
   id: string;
@@ -118,6 +120,21 @@ export default async function UserDetailPage({
   const distinctCourses = new Set(records.map((r) => r.courseName).filter(Boolean)).size;
   const distinctPeople = new Set(records.map((r) => r.personId)).size;
 
+  const feedbackCsv =
+    profile.role === "student"
+      ? toCsv([
+          ["Date", "Course", "Lesson", "Recorded by", "Mark", "Feedback"],
+          ...records.map((r) => [
+            r.date,
+            r.courseName ?? "",
+            r.lessonName ?? "",
+            peopleById.get(r.personId) ?? "",
+            r.mark != null ? String(r.mark) : "",
+            r.feedback ?? "",
+          ]),
+        ])
+      : null;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
@@ -168,7 +185,13 @@ export default async function UserDetailPage({
               }
             />
           ) : (
-            <Table>
+            <>
+              {feedbackCsv && (
+                <div className="flex justify-end">
+                  <DownloadCsvButton filename={`${profile.full_name}-feedback.csv`} csv={feedbackCsv} />
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -195,7 +218,8 @@ export default async function UserDetailPage({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </>
           )}
         </>
       )}

@@ -60,6 +60,20 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => !(r.length === 1 && r[0].trim() === ""));
 }
 
+export function toCsv(rows: string[][]): string {
+  return rows
+    .map((row) =>
+      row
+        .map((field) => {
+          const needsQuoting = /["\r\n,]/.test(field);
+          const escaped = field.replace(/"/g, '""');
+          return needsQuoting ? `"${escaped}"` : escaped;
+        })
+        .join(",")
+    )
+    .join("\r\n");
+}
+
 export type ParsedInviteRow = { fullName: string; email: string };
 
 const NAME_HEADERS = ["name", "full_name", "fullname", "full name"];

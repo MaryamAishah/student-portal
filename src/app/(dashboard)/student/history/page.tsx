@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth/get-session";
 import { LessonHistoryTable, type LessonHistoryRow } from "@/components/student/lesson-history-table";
+import { DownloadCsvButton } from "@/components/shared/download-csv-button";
+import { toCsv } from "@/lib/csv";
 
 export default async function StudentHistoryPage() {
   const profile = await getSessionProfile();
@@ -21,11 +23,27 @@ export default async function StudentHistoryPage() {
     feedback: r.feedback,
   }));
 
+  const csv = toCsv([
+    ["Date", "Course", "Lesson", "Mark", "Feedback"],
+    ...rows.map((r) => [
+      r.entryDate,
+      r.courseName,
+      r.lessonTitle,
+      r.mark != null ? String(r.mark) : "",
+      r.feedback ?? "",
+    ]),
+  ]);
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Lesson history</h1>
-        <p className="text-sm text-muted-foreground">Every mark and note recorded for you.</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Lesson history</h1>
+          <p className="text-sm text-muted-foreground">Every mark and note recorded for you.</p>
+        </div>
+        {rows.length > 0 && (
+          <DownloadCsvButton filename="my-feedback.csv" csv={csv} />
+        )}
       </div>
       <LessonHistoryTable rows={rows} />
     </div>
