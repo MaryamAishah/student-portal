@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/get-session";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -13,6 +14,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { ResendInviteButton } from "@/components/admin/resend-invite-button";
 import { DownloadCsvButton } from "@/components/shared/download-csv-button";
+import { DeleteUserButton } from "@/components/admin/delete-user-button";
 import { toCsv } from "@/lib/csv";
 
 type NormalizedRecord = {
@@ -22,7 +24,7 @@ type NormalizedRecord = {
   lessonName: string | null;
   mark: number | null;
   feedback: string | null;
-  personId: string;
+  personId: string | null;
 };
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -45,6 +47,7 @@ export default async function UserDetailPage({
 }) {
   const { userId } = await params;
   const supabase = await createClient();
+  const sessionProfile = await getSessionProfile();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -78,7 +81,7 @@ export default async function UserDetailPage({
       personId: r.student_id,
     }));
 
-    const studentIds = [...new Set(records.map((r) => r.personId))];
+    const studentIds = [...new Set(records.map((r) => r.personId).filter((id): id is string => id !== null))];
     if (studentIds.length > 0) {
       const { data: students } = await supabase
         .from("profiles")
@@ -104,7 +107,7 @@ export default async function UserDetailPage({
       personId: r.recorded_by,
     }));
 
-    const teacherIds = [...new Set(records.map((r) => r.personId))];
+    const teacherIds = [...new Set(records.map((r) => r.personId).filter((id): id is string => id !== null))];
     if (teacherIds.length > 0) {
       const { data: teachers } = await supabase
         .from("profiles")
@@ -118,7 +121,13 @@ export default async function UserDetailPage({
   const average =
     marked.length > 0 ? marked.reduce((sum, r) => sum + Number(r.mark), 0) / marked.length : null;
   const distinctCourses = new Set(records.map((r) => r.courseName).filter(Boolean)).size;
-  const distinctPeople = new Set(records.map((r) => r.personId)).size;
+  const distinctPeople = new Set(records.map((r) => r.personId).filter((id) => id !== null)).size;
+
+  const deletedPersonLabel = profile.role === "teacher" ? "(deleted student)" : "(deleted teacher)";
+  function personLabel(personId: string | null): string {
+    if (personId === null) return deletedPersonLabel;
+    return peopleById.get(personId) ?? "—";
+  }
 
   const feedbackCsv =
     profile.role === "student"
@@ -128,7 +137,7 @@ export default async function UserDetailPage({
             r.date,
             r.courseName ?? "",
             r.lessonName ?? "",
-            peopleById.get(r.personId) ?? "",
+            personLabel(r.personId),
             r.mark != null ? String(r.mark) : "",
             r.feedback ?? "",
           ]),
@@ -154,9 +163,14 @@ export default async function UserDetailPage({
             </Badge>
           )}
         </div>
-        {profile.role !== "admin" && profile.must_change_password && (
-          <ResendInviteButton userId={profile.id} />
-        )}
+        <div className="flex items-center gap-2">
+          {profile.role !== "admin" && profile.must_change_password && (
+            <ResendInviteButton userId={profile.id} />
+          )}
+          {profile.id !== sessionProfile?.id && (
+            <DeleteUserButton userId={profile.id} fullName={profile.full_name} role={profile.role} />
+          )}
+        </div>
       </div>
 
       {profile.role === "admin" ? (
@@ -210,7 +224,7 @@ export default async function UserDetailPage({
                     </TableCell>
                     <TableCell>{r.courseName ?? "—"}</TableCell>
                     <TableCell>{r.lessonName ?? "—"}</TableCell>
-                    <TableCell>{peopleById.get(r.personId) ?? "—"}</TableCell>
+                    <TableCell>{personLabel(r.personId)}</TableCell>
                     <TableCell className="font-medium">{r.mark ?? "—"}</TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground">
                       {r.feedback ?? "—"}

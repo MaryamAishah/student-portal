@@ -26,7 +26,7 @@ export type Database = {
           id: string;
           name: string;
           description: string | null;
-          created_by: string;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -178,7 +178,7 @@ export type Database = {
           entry_date: string;
           mark: number | null;
           feedback: string | null;
-          recorded_by: string;
+          recorded_by: string | null;
           created_at: string;
           updated_at: string;
         };
