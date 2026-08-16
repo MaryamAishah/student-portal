@@ -55,7 +55,7 @@ export default async function CourseDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{course.name}</h1>
           {course.description && <p className="text-sm text-muted-foreground">{course.description}</p>}
@@ -100,7 +100,7 @@ export default async function CourseDetailPage({
         </TabsContent>
 
         <TabsContent value="groups" className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               Teachers and students are assigned to a group, not the course directly. Lessons
               above are shared across every group.

@@ -154,7 +154,39 @@ export function RosterGrid({
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
+      {/* Card layout below md: a 3-column table (name, mark, freeform
+          feedback) doesn't fit a phone screen without constant
+          horizontal scrolling mid-entry, so stack each student instead. */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {students.map((student) => (
+          <div key={student.id} className="flex flex-col gap-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-medium">{student.full_name}</p>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step="0.5"
+                disabled={loading}
+                value={rows[student.id]?.mark ?? ""}
+                onChange={(e) => updateRow(student.id, "mark", e.target.value)}
+                className="w-20 shrink-0"
+                aria-label={`Mark for ${student.full_name}`}
+              />
+            </div>
+            <Textarea
+              rows={2}
+              disabled={loading}
+              value={rows[student.id]?.feedback ?? ""}
+              onChange={(e) => updateRow(student.id, "feedback", e.target.value)}
+              placeholder="Personalized feedback…"
+              aria-label={`Feedback for ${student.full_name}`}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border md:block">
         <Table>
           <TableHeader>
             <TableRow>

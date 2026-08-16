@@ -30,14 +30,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b bg-sidebar p-4 text-sidebar-foreground md:hidden">
-          <div>
-            <p className="font-heading text-lg font-bold text-primary">Student Portal</p>
-            <p className="text-xs font-medium capitalize text-muted-foreground">{profile.role}</p>
+        <header className="flex flex-col gap-3 border-b bg-sidebar p-4 text-sidebar-foreground md:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-heading text-lg font-bold text-primary">Student Portal</p>
+              <p className="text-xs font-medium capitalize text-muted-foreground">{profile.role}</p>
+            </div>
+            <LogoutButton />
           </div>
-          <LogoutButton />
+          <RoleNav role={profile.role} className="flex-row gap-1 overflow-x-auto" />
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );
