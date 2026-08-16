@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,10 +30,11 @@ type ResultRow = {
   message?: string;
 };
 
-export function BulkInviteForm() {
+export function BulkInviteForm({ courses }: { courses: { id: string; name: string }[] }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<"teacher" | "student">("student");
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedInviteRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -35,6 +43,8 @@ export function BulkInviteForm() {
 
   const validRows = rows.filter((r) => r.fullName && r.email);
   const skippedCount = rows.length - validRows.length;
+  const hasGroups = validRows.some((r) => r.group);
+  const missingCourseForGroups = role === "student" && hasGroups && !courseId;
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -66,7 +76,11 @@ export function BulkInviteForm() {
     const res = await fetch("/api/admin/users/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role, rows: validRows }),
+      body: JSON.stringify({
+        role,
+        rows: validRows,
+        courseId: role === "student" ? courseId : null,
+      }),
     });
     const data = await res.json();
     setPending(false);
@@ -103,7 +117,9 @@ export function BulkInviteForm() {
                 <TableCell className="text-muted-foreground">{r.email}</TableCell>
                 <TableCell>
                   {r.status === "invited" ? (
-                    <Badge variant="secondary">Invited</Badge>
+                    <Badge variant="secondary" title={r.message}>
+                      {r.message ? "Invited & enrolled" : "Invited"}
+                    </Badge>
                   ) : (
                     <Badge variant="destructive" title={r.message}>
                       {r.message ?? "Error"}
@@ -148,12 +164,40 @@ export function BulkInviteForm() {
         </p>
       </div>
 
+      {role === "student" && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="course">Course (optional)</Label>
+          <Select
+            value={courseId ?? undefined}
+            onValueChange={(v) => setCourseId(v || null)}
+            items={courses.map((c) => ({ value: c.id, label: c.name }))}
+          >
+            <SelectTrigger id="course" className="w-full">
+              <SelectValue placeholder="No course — skip group assignment" />
+            </SelectTrigger>
+            <SelectContent>
+              {courses.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            If your CSV has an optional <span className="font-mono">group</span> column, pick the
+            course it belongs to here and each student will be auto-enrolled into the matching
+            group.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="csv">CSV file</Label>
         <Input id="csv" type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} />
         <p className="text-xs text-muted-foreground">
           Needs a header row with <span className="font-mono">name</span> and{" "}
-          <span className="font-mono">email</span> columns.
+          <span className="font-mono">email</span> columns, plus an optional{" "}
+          <span className="font-mono">group</span> column for students.
         </p>
       </div>
 
@@ -174,6 +218,7 @@ export function BulkInviteForm() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    {hasGroups && <TableHead>Group</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -181,18 +226,25 @@ export function BulkInviteForm() {
                     <TableRow key={`${r.email}-${i}`}>
                       <TableCell>{r.fullName}</TableCell>
                       <TableCell className="text-muted-foreground">{r.email}</TableCell>
+                      {hasGroups && <TableCell className="text-muted-foreground">{r.group || "—"}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
+          {missingCourseForGroups && (
+            <p className="text-sm text-destructive">
+              This file has group names — pick a course above so they can be assigned, or upload
+              without a group column.
+            </p>
+          )}
         </div>
       )}
 
       <Button
         type="button"
-        disabled={pending || validRows.length === 0}
+        disabled={pending || validRows.length === 0 || missingCourseForGroups}
         onClick={handleSubmit}
         className="self-start"
       >

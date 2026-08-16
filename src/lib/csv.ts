@@ -74,10 +74,11 @@ export function toCsv(rows: string[][]): string {
     .join("\r\n");
 }
 
-export type ParsedInviteRow = { fullName: string; email: string };
+export type ParsedInviteRow = { fullName: string; email: string; group: string };
 
 const NAME_HEADERS = ["name", "full_name", "fullname", "full name"];
 const EMAIL_HEADERS = ["email", "e-mail", "email address"];
+const GROUP_HEADERS = ["group", "group name", "batch", "section"];
 
 export function extractInviteRows(csvText: string): {
   rows: ParsedInviteRow[];
@@ -91,6 +92,7 @@ export function extractInviteRows(csvText: string): {
   const header = table[0].map((h) => h.trim().toLowerCase());
   const nameIdx = header.findIndex((h) => NAME_HEADERS.includes(h));
   const emailIdx = header.findIndex((h) => EMAIL_HEADERS.includes(h));
+  const groupIdx = header.findIndex((h) => GROUP_HEADERS.includes(h));
 
   if (nameIdx === -1 || emailIdx === -1) {
     return {
@@ -103,8 +105,9 @@ export function extractInviteRows(csvText: string): {
   for (const line of table.slice(1)) {
     const fullName = (line[nameIdx] ?? "").trim();
     const email = (line[emailIdx] ?? "").trim();
+    const group = groupIdx === -1 ? "" : (line[groupIdx] ?? "").trim();
     if (!fullName && !email) continue;
-    rows.push({ fullName, email });
+    rows.push({ fullName, email, group });
   }
 
   return { rows, error: null };

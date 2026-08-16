@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionProfile } from "@/lib/auth/get-session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/types/database.types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const role = body.role as UserRole;
   const rows = Array.isArray(body.rows) ? body.rows : [];
+  const courseId = typeof body.courseId === "string" && body.courseId ? body.courseId : null;
 
   if (role !== "teacher" && role !== "student") {
     return NextResponse.json({ error: "Invalid role." }, { status: 400 });
@@ -40,6 +42,16 @@ export async function POST(request: Request) {
   const adminClient = createAdminClient();
   const { origin } = new URL(request.url);
 
+  let groupIdByName: Map<string, string> | null = null;
+  if (role === "student" && courseId) {
+    const supabase = await createClient();
+    const { data: groups } = await supabase
+      .from("course_groups")
+      .select("id, name")
+      .eq("course_id", courseId);
+    groupIdByName = new Map((groups ?? []).map((g) => [g.name.trim().toLowerCase(), g.id]));
+  }
+
   const seen = new Set<string>();
   const results: ResultRow[] = [];
 
@@ -48,6 +60,7 @@ export async function POST(request: Request) {
     const email = String((raw as { email?: unknown })?.email ?? "")
       .trim()
       .toLowerCase();
+    const groupName = String((raw as { group?: unknown })?.group ?? "").trim();
 
     if (!email || !EMAIL_RE.test(email)) {
       results.push({ email: email || "(blank)", fullName, status: "error", message: "Invalid email." });
@@ -63,16 +76,50 @@ export async function POST(request: Request) {
     }
     seen.add(email);
 
-    const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
+    let groupId: string | null = null;
+    if (groupName && groupIdByName) {
+      groupId = groupIdByName.get(groupName.toLowerCase()) ?? null;
+      if (!groupId) {
+        results.push({
+          email,
+          fullName,
+          status: "error",
+          message: `No group named "${groupName}" in this course.`,
+        });
+        continue;
+      }
+    }
+
+    const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName, role },
       redirectTo: `${origin}/reset-password`,
     });
 
     if (error) {
       results.push({ email, fullName, status: "error", message: error.message });
-    } else {
-      results.push({ email, fullName, status: "invited" });
+      continue;
     }
+
+    if (groupId && courseId && data.user) {
+      const { error: enrollError } = await adminClient
+        .from("enrollments")
+        .insert({ course_id: courseId, group_id: groupId, student_id: data.user.id });
+
+      if (enrollError) {
+        results.push({
+          email,
+          fullName,
+          status: "invited",
+          message: `Invited, but couldn't enroll in "${groupName}": ${enrollError.message}`,
+        });
+        continue;
+      }
+
+      results.push({ email, fullName, status: "invited", message: `Invited and enrolled in "${groupName}".` });
+      continue;
+    }
+
+    results.push({ email, fullName, status: "invited" });
   }
 
   const invited = results.filter((r) => r.status === "invited").length;

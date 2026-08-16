@@ -1,9 +1,16 @@
+import { createClient } from "@/lib/supabase/server";
 import { CreateUserForm } from "@/components/admin/create-user-form";
 import { BulkInviteForm } from "@/components/admin/bulk-invite-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function NewUserPage() {
+export default async function NewUserPage() {
+  const supabase = await createClient();
+  const { data: courses } = await supabase
+    .from("courses")
+    .select("id, name")
+    .order("name", { ascending: true });
+
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div>
@@ -29,7 +36,7 @@ export default function NewUserPage() {
               <CardTitle>Bulk invite from CSV</CardTitle>
             </CardHeader>
             <CardContent>
-              <BulkInviteForm />
+              <BulkInviteForm courses={courses ?? []} />
             </CardContent>
           </Card>
         </TabsContent>
