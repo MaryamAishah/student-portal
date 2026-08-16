@@ -28,7 +28,7 @@ export default async function RosterPage({
     supabase.from("courses").select("id, name").eq("id", courseId).single(),
     supabase
       .from("lessons")
-      .select("id, title")
+      .select("id, title, description")
       .eq("course_id", courseId)
       .order("sort_order", { ascending: true }),
     supabase

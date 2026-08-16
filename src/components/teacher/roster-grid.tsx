@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Lesson = { id: string; title: string };
+type Lesson = { id: string; title: string; description: string | null };
 type Student = { id: string; full_name: string };
 type RowState = { mark: string; feedback: string };
 
@@ -49,6 +49,7 @@ export function RosterGrid({
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const supabase = useMemo(() => createClient(), []);
+  const selectedLesson = lessons.find((lesson) => lesson.id === lessonId);
 
   useEffect(() => {
     if (!lessonId || !entryDate) return;
@@ -114,38 +115,43 @@ export function RosterGrid({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-end">
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="lesson">Lesson</Label>
-          <Select
-            value={lessonId}
-            onValueChange={(value) => value && setLessonId(value)}
-            items={lessons.map((lesson) => ({ value: lesson.id, label: lesson.title }))}
-          >
-            <SelectTrigger id="lesson" className="w-full">
-              <SelectValue placeholder="Select a lesson" />
-            </SelectTrigger>
-            <SelectContent>
-              {lessons.map((lesson) => (
-                <SelectItem key={lesson.id} value={lesson.id}>
-                  {lesson.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col gap-3 rounded-lg border p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex flex-1 flex-col gap-2">
+            <Label htmlFor="lesson">Lesson</Label>
+            <Select
+              value={lessonId}
+              onValueChange={(value) => value && setLessonId(value)}
+              items={lessons.map((lesson) => ({ value: lesson.id, label: lesson.title }))}
+            >
+              <SelectTrigger id="lesson" className="w-full">
+                <SelectValue placeholder="Select a lesson" />
+              </SelectTrigger>
+              <SelectContent>
+                {lessons.map((lesson) => (
+                  <SelectItem key={lesson.id} value={lesson.id}>
+                    {lesson.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-1 flex-col gap-2">
+            <Label htmlFor="entryDate">Date</Label>
+            <Input
+              id="entryDate"
+              type="date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleSave} disabled={isPending || loading} className="sm:w-40">
+            {isPending ? "Saving…" : "Save all"}
+          </Button>
         </div>
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="entryDate">Date</Label>
-          <Input
-            id="entryDate"
-            type="date"
-            value={entryDate}
-            onChange={(e) => setEntryDate(e.target.value)}
-          />
-        </div>
-        <Button onClick={handleSave} disabled={isPending || loading} className="sm:w-40">
-          {isPending ? "Saving…" : "Save all"}
-        </Button>
+        {selectedLesson?.description && (
+          <p className="text-sm text-muted-foreground">{selectedLesson.description}</p>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
