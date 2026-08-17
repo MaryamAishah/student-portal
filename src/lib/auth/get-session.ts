@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/types/database.types";
 
@@ -9,7 +10,10 @@ export type SessionProfile = {
   mustChangePassword: boolean;
 };
 
-export async function getSessionProfile(): Promise<SessionProfile | null> {
+// Called from both the dashboard layout and most pages it wraps, within
+// the same request/render — cache() collapses those into a single
+// auth.getUser() + profiles lookup instead of repeating it per call site.
+export const getSessionProfile = cache(async (): Promise<SessionProfile | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -35,4 +39,4 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
     role: profile.role,
     mustChangePassword: profile.must_change_password,
   };
-}
+});
