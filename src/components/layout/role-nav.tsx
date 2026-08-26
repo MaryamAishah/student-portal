@@ -11,7 +11,10 @@ const NAV_ITEMS: Record<UserRole, { href: string; label: string }[]> = {
     { href: "/admin/courses", label: "Courses" },
     { href: "/admin/users", label: "Users" },
   ],
-  teacher: [{ href: "/teacher", label: "My courses" }],
+  teacher: [
+    { href: "/teacher", label: "My courses" },
+    { href: "/teacher/feedback", label: "Feedback" },
+  ],
   student: [
     { href: "/student", label: "Dashboard" },
     { href: "/student/history", label: "History" },
