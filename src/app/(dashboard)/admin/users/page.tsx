@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
+import { StudentsTable } from "@/components/admin/students-table";
 
 type Profile = {
   id: string;
@@ -96,7 +97,7 @@ export default async function UsersPage() {
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Students ({students.length})</h2>
-        <UserTable users={students} emptyLabel="No students yet" />
+        <StudentsTable students={students} />
       </div>
 
       {admins.length > 0 && (
