@@ -41,26 +41,29 @@ export async function saveRosterEntriesAction(
   return { error: null };
 }
 
-export async function updateLessonTitleAction(
+export async function updateLessonOverrideAction(
   lessonId: string,
   courseId: string,
-  title: string
+  title: string,
+  description: string
 ): Promise<{ error: string | null }> {
   const profile = await requireRole("teacher");
   const supabase = await createClient();
-  const trimmed = title.trim();
+
+  const title_ = title.trim() === "" ? null : title.trim();
+  const description_ = description.trim() === "" ? null : description.trim();
 
   const { error } =
-    trimmed === ""
+    title_ === null && description_ === null
       ? await supabase
-          .from("lesson_teacher_titles")
+          .from("lesson_teacher_overrides")
           .delete()
           .eq("lesson_id", lessonId)
           .eq("teacher_id", profile.id)
       : await supabase
-          .from("lesson_teacher_titles")
+          .from("lesson_teacher_overrides")
           .upsert(
-            { lesson_id: lessonId, teacher_id: profile.id, title: trimmed },
+            { lesson_id: lessonId, teacher_id: profile.id, title: title_, description: description_ },
             { onConflict: "lesson_id,teacher_id" }
           );
 

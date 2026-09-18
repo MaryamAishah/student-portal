@@ -214,22 +214,24 @@ export type Database = {
           },
         ];
       };
-      lesson_teacher_titles: {
+      lesson_teacher_overrides: {
         Row: {
           lesson_id: string;
           teacher_id: string;
-          title: string;
+          title: string | null;
+          description: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           lesson_id: string;
           teacher_id: string;
-          title: string;
+          title?: string | null;
+          description?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["lesson_teacher_titles"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["lesson_teacher_overrides"]["Row"]>;
         Relationships: [
           {
             foreignKeyName: "lesson_teacher_titles_lesson_id_fkey";

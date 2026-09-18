@@ -24,7 +24,7 @@ export default async function RosterPage({
     notFound();
   }
 
-  const [{ data: course }, { data: lessons }, { data: enrollments }, { data: titleOverrides }] =
+  const [{ data: course }, { data: lessons }, { data: enrollments }, { data: overrides }] =
     await Promise.all([
       supabase.from("courses").select("id, name").eq("id", courseId).single(),
       supabase
@@ -38,8 +38,8 @@ export default async function RosterPage({
         .eq("course_id", courseId)
         .eq("group_id", assignment.group_id),
       supabase
-        .from("lesson_teacher_titles")
-        .select("lesson_id, title")
+        .from("lesson_teacher_overrides")
+        .select("lesson_id, title, description")
         .eq("teacher_id", profile!.id),
     ]);
 
@@ -48,13 +48,18 @@ export default async function RosterPage({
     .filter((p): p is { id: string; full_name: string } => p !== null)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-  const overrideByLessonId = new Map((titleOverrides ?? []).map((o) => [o.lesson_id, o.title]));
-  const lessonsWithTitles = (lessons ?? []).map((lesson) => ({
-    ...lesson,
-    title: overrideByLessonId.get(lesson.id) ?? lesson.title,
-    defaultTitle: lesson.title,
-    hasCustomTitle: overrideByLessonId.has(lesson.id),
-  }));
+  const overrideByLessonId = new Map((overrides ?? []).map((o) => [o.lesson_id, o]));
+  const lessonsWithOverrides = (lessons ?? []).map((lesson) => {
+    const override = overrideByLessonId.get(lesson.id);
+    return {
+      ...lesson,
+      title: override?.title ?? lesson.title,
+      description: override?.description ?? lesson.description,
+      defaultTitle: lesson.title,
+      defaultDescription: lesson.description,
+      hasOverride: override !== undefined,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,12 +73,12 @@ export default async function RosterPage({
         </p>
       </div>
 
-      {lessonsWithTitles.length === 0 ? (
+      {lessonsWithOverrides.length === 0 ? (
         <EmptyState title="No lessons yet" description="Ask an admin to add lessons to this course." />
       ) : students.length === 0 ? (
         <EmptyState title="No students enrolled" description="Ask an admin to enroll students in your group." />
       ) : (
-        <RosterGrid courseId={courseId} lessons={lessonsWithTitles} students={students} />
+        <RosterGrid courseId={courseId} lessons={lessonsWithOverrides} students={students} />
       )}
     </div>
   );

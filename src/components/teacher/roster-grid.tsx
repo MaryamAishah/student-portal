@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { saveRosterEntriesAction, updateLessonTitleAction } from "@/lib/actions/teacher-actions";
+import { saveRosterEntriesAction, updateLessonOverrideAction } from "@/lib/actions/teacher-actions";
 import {
   Select,
   SelectContent,
@@ -30,7 +30,8 @@ type Lesson = {
   title: string;
   description: string | null;
   defaultTitle: string;
-  hasCustomTitle: boolean;
+  defaultDescription: string | null;
+  hasOverride: boolean;
 };
 type Student = { id: string; full_name: string };
 type RowState = { mark: string; feedback: string };
@@ -55,42 +56,48 @@ export function RosterGrid({
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingLesson, setEditingLesson] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  const [isTitlePending, startTitleTransition] = useTransition();
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [isOverridePending, startOverrideTransition] = useTransition();
   const supabase = useMemo(() => createClient(), []);
   const selectedLesson = lessons.find((lesson) => lesson.id === lessonId);
 
-  function startEditingTitle() {
+  function startEditingLesson() {
     setTitleDraft(selectedLesson?.title ?? "");
-    setEditingTitle(true);
+    setDescriptionDraft(selectedLesson?.description ?? "");
+    setEditingLesson(true);
   }
 
-  function handleSaveTitle() {
+  function handleSaveOverride() {
     if (!selectedLesson) return;
-    const title = titleDraft;
 
-    startTitleTransition(async () => {
-      const result = await updateLessonTitleAction(selectedLesson.id, courseId, title);
+    startOverrideTransition(async () => {
+      const result = await updateLessonOverrideAction(
+        selectedLesson.id,
+        courseId,
+        titleDraft,
+        descriptionDraft
+      );
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Updated your title for this lesson.");
-        setEditingTitle(false);
+        toast.success("Updated your title and description for this lesson.");
+        setEditingLesson(false);
       }
     });
   }
 
-  function handleResetTitle() {
+  function handleResetOverride() {
     if (!selectedLesson) return;
 
-    startTitleTransition(async () => {
-      const result = await updateLessonTitleAction(selectedLesson.id, courseId, "");
+    startOverrideTransition(async () => {
+      const result = await updateLessonOverrideAction(selectedLesson.id, courseId, "", "");
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Reset to the default title.");
-        setEditingTitle(false);
+        toast.success("Reset to the default title and description.");
+        setEditingLesson(false);
       }
     });
   }
@@ -127,9 +134,6 @@ export function RosterGrid({
     };
   }, [lessonId, entryDate, students, supabase]);
 
-  useEffect(() => {
-    setEditingTitle(false);
-  }, [lessonId]);
 
   function updateRow(studentId: string, field: keyof RowState, value: string) {
     setRows((prev) => ({
@@ -169,7 +173,11 @@ export function RosterGrid({
             <Label htmlFor="lesson">Lesson</Label>
             <Select
               value={lessonId}
-              onValueChange={(value) => value && setLessonId(value)}
+              onValueChange={(value) => {
+                if (!value) return;
+                setLessonId(value);
+                setEditingLesson(false);
+              }}
               items={lessons.map((lesson) => ({ value: lesson.id, label: lesson.title }))}
             >
               <SelectTrigger id="lesson" className="w-full">
@@ -197,8 +205,8 @@ export function RosterGrid({
             {isPending ? "Saving…" : "Save all"}
           </Button>
         </div>
-        {selectedLesson && editingTitle ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {selectedLesson && editingLesson ? (
+          <div className="flex flex-col gap-2">
             <Input
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
@@ -206,36 +214,43 @@ export function RosterGrid({
               className="sm:max-w-xs"
               aria-label="Your title for this lesson"
             />
+            <Textarea
+              rows={2}
+              value={descriptionDraft}
+              onChange={(e) => setDescriptionDraft(e.target.value)}
+              placeholder={selectedLesson.defaultDescription ?? "Your description for this lesson…"}
+              aria-label="Your description for this lesson"
+            />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveTitle} disabled={isTitlePending}>
+              <Button size="sm" onClick={handleSaveOverride} disabled={isOverridePending}>
                 Save
               </Button>
-              {selectedLesson.hasCustomTitle && (
-                <Button size="sm" variant="outline" onClick={handleResetTitle} disabled={isTitlePending}>
+              {selectedLesson.hasOverride && (
+                <Button size="sm" variant="outline" onClick={handleResetOverride} disabled={isOverridePending}>
                   Reset to default
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={() => setEditingTitle(false)} disabled={isTitlePending}>
+              <Button size="sm" variant="ghost" onClick={() => setEditingLesson(false)} disabled={isOverridePending}>
                 Cancel
               </Button>
             </div>
           </div>
         ) : (
           selectedLesson && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1">
               <button
                 type="button"
-                onClick={startEditingTitle}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                onClick={startEditingLesson}
+                className="flex items-center gap-1 self-start text-sm text-muted-foreground hover:text-foreground"
               >
                 <PencilIcon className="size-3.5" />
-                {selectedLesson.hasCustomTitle ? "Edit your title" : "Set your own title"}
+                {selectedLesson.hasOverride ? "Edit your title & description" : "Set your own title & description"}
               </button>
+              {selectedLesson.description && (
+                <p className="text-sm text-muted-foreground">{selectedLesson.description}</p>
+              )}
             </div>
           )
-        )}
-        {selectedLesson?.description && (
-          <p className="text-sm text-muted-foreground">{selectedLesson.description}</p>
         )}
       </div>
 
