@@ -24,24 +24,37 @@ export default async function RosterPage({
     notFound();
   }
 
-  const [{ data: course }, { data: lessons }, { data: enrollments }] = await Promise.all([
-    supabase.from("courses").select("id, name").eq("id", courseId).single(),
-    supabase
-      .from("lessons")
-      .select("id, title, description")
-      .eq("course_id", courseId)
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("enrollments")
-      .select("profiles(id, full_name)")
-      .eq("course_id", courseId)
-      .eq("group_id", assignment.group_id),
-  ]);
+  const [{ data: course }, { data: lessons }, { data: enrollments }, { data: titleOverrides }] =
+    await Promise.all([
+      supabase.from("courses").select("id, name").eq("id", courseId).single(),
+      supabase
+        .from("lessons")
+        .select("id, title, description")
+        .eq("course_id", courseId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("enrollments")
+        .select("profiles(id, full_name)")
+        .eq("course_id", courseId)
+        .eq("group_id", assignment.group_id),
+      supabase
+        .from("lesson_teacher_titles")
+        .select("lesson_id, title")
+        .eq("teacher_id", profile!.id),
+    ]);
 
   const students = (enrollments ?? [])
     .map((e) => e.profiles)
     .filter((p): p is { id: string; full_name: string } => p !== null)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+  const overrideByLessonId = new Map((titleOverrides ?? []).map((o) => [o.lesson_id, o.title]));
+  const lessonsWithTitles = (lessons ?? []).map((lesson) => ({
+    ...lesson,
+    title: overrideByLessonId.get(lesson.id) ?? lesson.title,
+    defaultTitle: lesson.title,
+    hasCustomTitle: overrideByLessonId.has(lesson.id),
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,12 +68,12 @@ export default async function RosterPage({
         </p>
       </div>
 
-      {!lessons || lessons.length === 0 ? (
+      {lessonsWithTitles.length === 0 ? (
         <EmptyState title="No lessons yet" description="Ask an admin to add lessons to this course." />
       ) : students.length === 0 ? (
         <EmptyState title="No students enrolled" description="Ask an admin to enroll students in your group." />
       ) : (
-        <RosterGrid courseId={courseId} lessons={lessons} students={students} />
+        <RosterGrid courseId={courseId} lessons={lessonsWithTitles} students={students} />
       )}
     </div>
   );

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { saveRosterEntriesAction } from "@/lib/actions/teacher-actions";
+import { saveRosterEntriesAction, updateLessonTitleAction } from "@/lib/actions/teacher-actions";
 import {
   Select,
   SelectContent,
@@ -24,7 +25,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Lesson = { id: string; title: string; description: string | null };
+type Lesson = {
+  id: string;
+  title: string;
+  description: string | null;
+  defaultTitle: string;
+  hasCustomTitle: boolean;
+};
 type Student = { id: string; full_name: string };
 type RowState = { mark: string; feedback: string };
 
@@ -48,8 +55,45 @@ export function RosterGrid({
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [isTitlePending, startTitleTransition] = useTransition();
   const supabase = useMemo(() => createClient(), []);
   const selectedLesson = lessons.find((lesson) => lesson.id === lessonId);
+
+  function startEditingTitle() {
+    setTitleDraft(selectedLesson?.title ?? "");
+    setEditingTitle(true);
+  }
+
+  function handleSaveTitle() {
+    if (!selectedLesson) return;
+    const title = titleDraft;
+
+    startTitleTransition(async () => {
+      const result = await updateLessonTitleAction(selectedLesson.id, courseId, title);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Updated your title for this lesson.");
+        setEditingTitle(false);
+      }
+    });
+  }
+
+  function handleResetTitle() {
+    if (!selectedLesson) return;
+
+    startTitleTransition(async () => {
+      const result = await updateLessonTitleAction(selectedLesson.id, courseId, "");
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Reset to the default title.");
+        setEditingTitle(false);
+      }
+    });
+  }
 
   useEffect(() => {
     if (!lessonId || !entryDate) return;
@@ -82,6 +126,10 @@ export function RosterGrid({
       cancelled = true;
     };
   }, [lessonId, entryDate, students, supabase]);
+
+  useEffect(() => {
+    setEditingTitle(false);
+  }, [lessonId]);
 
   function updateRow(studentId: string, field: keyof RowState, value: string) {
     setRows((prev) => ({
@@ -149,6 +197,43 @@ export function RosterGrid({
             {isPending ? "Saving…" : "Save all"}
           </Button>
         </div>
+        {selectedLesson && editingTitle ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              placeholder={selectedLesson.defaultTitle}
+              className="sm:max-w-xs"
+              aria-label="Your title for this lesson"
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveTitle} disabled={isTitlePending}>
+                Save
+              </Button>
+              {selectedLesson.hasCustomTitle && (
+                <Button size="sm" variant="outline" onClick={handleResetTitle} disabled={isTitlePending}>
+                  Reset to default
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setEditingTitle(false)} disabled={isTitlePending}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          selectedLesson && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={startEditingTitle}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <PencilIcon className="size-3.5" />
+                {selectedLesson.hasCustomTitle ? "Edit your title" : "Set your own title"}
+              </button>
+            </div>
+          )
+        )}
         {selectedLesson?.description && (
           <p className="text-sm text-muted-foreground">{selectedLesson.description}</p>
         )}

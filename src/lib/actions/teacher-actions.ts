@@ -40,3 +40,34 @@ export async function saveRosterEntriesAction(
   revalidatePath(`/teacher/courses/${courseId}/roster`);
   return { error: null };
 }
+
+export async function updateLessonTitleAction(
+  lessonId: string,
+  courseId: string,
+  title: string
+): Promise<{ error: string | null }> {
+  const profile = await requireRole("teacher");
+  const supabase = await createClient();
+  const trimmed = title.trim();
+
+  const { error } =
+    trimmed === ""
+      ? await supabase
+          .from("lesson_teacher_titles")
+          .delete()
+          .eq("lesson_id", lessonId)
+          .eq("teacher_id", profile.id)
+      : await supabase
+          .from("lesson_teacher_titles")
+          .upsert(
+            { lesson_id: lessonId, teacher_id: profile.id, title: trimmed },
+            { onConflict: "lesson_id,teacher_id" }
+          );
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/teacher/courses/${courseId}/roster`);
+  return { error: null };
+}

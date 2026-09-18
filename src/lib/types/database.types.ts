@@ -214,6 +214,39 @@ export type Database = {
           },
         ];
       };
+      lesson_teacher_titles: {
+        Row: {
+          lesson_id: string;
+          teacher_id: string;
+          title: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          lesson_id: string;
+          teacher_id: string;
+          title: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["lesson_teacher_titles"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "lesson_teacher_titles_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lesson_teacher_titles_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
