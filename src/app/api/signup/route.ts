@@ -21,44 +21,68 @@ export async function POST(request: Request) {
     .eq("email", email)
     .maybeSingle();
 
-  if (!pending) {
+  if (pending) {
+    const { data: created, error: createError } = await adminClient.auth.admin.createUser({
+      email: pending.email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: pending.full_name, role: pending.role },
+    });
+
+    if (createError || !created.user) {
+      return NextResponse.json(
+        { error: createError?.message ?? "Couldn't create your account." },
+        { status: 400 }
+      );
+    }
+
+    const userId = created.user.id;
+
+    // They just chose this password themselves — no need to force a change.
+    await adminClient.from("profiles").update({ must_change_password: false }).eq("id", userId);
+
+    let warning: string | null = null;
+    if (pending.role === "student" && pending.course_id && pending.group_id) {
+      const { error: enrollError } = await adminClient
+        .from("enrollments")
+        .insert({ course_id: pending.course_id, group_id: pending.group_id, student_id: userId });
+
+      if (enrollError) {
+        warning = `Your account was created, but we couldn't enroll you in your course: ${enrollError.message}. Ask your admin to add you manually.`;
+      }
+    }
+
+    await adminClient.from("pending_signups").delete().eq("id", pending.id);
+
+    return NextResponse.json({ ok: true, warning });
+  }
+
+  // Not a self-serve pending row — check for an existing account that was
+  // emailed an invite but hasn't set its password yet, and let them finish
+  // activation here instead of needing that email.
+  const { data: profile } = await adminClient
+    .from("profiles")
+    .select("id, role, must_change_password")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (!profile || profile.role === "admin" || !profile.must_change_password) {
     return NextResponse.json(
       { error: "We don't have an invitation on file for that email. Ask your admin." },
       { status: 404 }
     );
   }
 
-  const { data: created, error: createError } = await adminClient.auth.admin.createUser({
-    email: pending.email,
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(profile.id, {
     password,
     email_confirm: true,
-    user_metadata: { full_name: pending.full_name, role: pending.role },
   });
 
-  if (createError || !created.user) {
-    return NextResponse.json(
-      { error: createError?.message ?? "Couldn't create your account." },
-      { status: 400 }
-    );
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 
-  const userId = created.user.id;
+  await adminClient.from("profiles").update({ must_change_password: false }).eq("id", profile.id);
 
-  // They just chose this password themselves — no need to force a change.
-  await adminClient.from("profiles").update({ must_change_password: false }).eq("id", userId);
-
-  let warning: string | null = null;
-  if (pending.role === "student" && pending.course_id && pending.group_id) {
-    const { error: enrollError } = await adminClient
-      .from("enrollments")
-      .insert({ course_id: pending.course_id, group_id: pending.group_id, student_id: userId });
-
-    if (enrollError) {
-      warning = `Your account was created, but we couldn't enroll you in your course: ${enrollError.message}. Ask your admin to add you manually.`;
-    }
-  }
-
-  await adminClient.from("pending_signups").delete().eq("id", pending.id);
-
-  return NextResponse.json({ ok: true, warning });
+  return NextResponse.json({ ok: true, warning: null });
 }
