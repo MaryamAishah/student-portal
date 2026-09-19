@@ -44,6 +44,24 @@ export default async function CourseDetailPage({
     notFound();
   }
 
+  const lessonIds = (lessons ?? []).map((l) => l.id);
+  const overridesByLesson = new Map<
+    string,
+    { teacherName: string; title: string | null; description: string | null }[]
+  >();
+  if (lessonIds.length > 0) {
+    const { data: overrides } = await supabase
+      .from("lesson_teacher_overrides")
+      .select("lesson_id, title, description, profiles(full_name)")
+      .in("lesson_id", lessonIds);
+
+    for (const o of overrides ?? []) {
+      const list = overridesByLesson.get(o.lesson_id) ?? [];
+      list.push({ teacherName: o.profiles?.full_name ?? "A teacher", title: o.title, description: o.description });
+      overridesByLesson.set(o.lesson_id, list);
+    }
+  }
+
   const teacherCountByGroup = new Map<string, number>();
   for (const t of courseTeachers ?? []) {
     teacherCountByGroup.set(t.group_id, (teacherCountByGroup.get(t.group_id) ?? 0) + 1);
@@ -91,6 +109,13 @@ export default async function CourseDetailPage({
                     {lesson.description && (
                       <p className="text-sm text-muted-foreground">{lesson.description}</p>
                     )}
+                    {(overridesByLesson.get(lesson.id) ?? []).map((o, i) => (
+                      <p key={i} className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium">{o.teacherName}</span> calls this &quot;
+                        {o.title ?? lesson.title}&quot;
+                        {o.description && ` — ${o.description}`}
+                      </p>
+                    ))}
                   </div>
                   <LessonActions lesson={lesson} courseId={courseId} />
                 </div>

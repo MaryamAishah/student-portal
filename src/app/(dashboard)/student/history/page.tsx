@@ -10,18 +10,38 @@ export default async function StudentHistoryPage() {
 
   const { data: records } = await supabase
     .from("lesson_records")
-    .select("id, entry_date, mark, feedback, lessons(title), courses(name)")
+    .select("id, entry_date, mark, feedback, lesson_id, recorded_by, lessons(title, description), courses(name)")
     .eq("student_id", profile!.id)
     .order("entry_date", { ascending: false });
 
-  const rows: LessonHistoryRow[] = (records ?? []).map((r) => ({
-    id: r.id,
-    courseName: r.courses?.name ?? "",
-    lessonTitle: r.lessons?.title ?? "",
-    entryDate: r.entry_date,
-    mark: r.mark,
-    feedback: r.feedback,
-  }));
+  const lessonIds = [...new Set((records ?? []).map((r) => r.lesson_id))];
+  const teacherIds = [
+    ...new Set((records ?? []).map((r) => r.recorded_by).filter((id): id is string => id !== null)),
+  ];
+
+  let overrides: { lesson_id: string; teacher_id: string; title: string | null; description: string | null }[] = [];
+  if (lessonIds.length > 0 && teacherIds.length > 0) {
+    const { data } = await supabase
+      .from("lesson_teacher_overrides")
+      .select("lesson_id, teacher_id, title, description")
+      .in("lesson_id", lessonIds)
+      .in("teacher_id", teacherIds);
+    overrides = data ?? [];
+  }
+  const overrideByKey = new Map(overrides.map((o) => [`${o.lesson_id}:${o.teacher_id}`, o]));
+
+  const rows: LessonHistoryRow[] = (records ?? []).map((r) => {
+    const override = r.recorded_by ? overrideByKey.get(`${r.lesson_id}:${r.recorded_by}`) : undefined;
+    return {
+      id: r.id,
+      courseName: r.courses?.name ?? "",
+      lessonTitle: override?.title ?? r.lessons?.title ?? "",
+      lessonDescription: override?.description ?? r.lessons?.description ?? null,
+      entryDate: r.entry_date,
+      mark: r.mark,
+      feedback: r.feedback,
+    };
+  });
 
   const csv = toCsv([
     ["Date", "Course", "Lesson", "Mark", "Feedback"],

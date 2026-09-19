@@ -12,6 +12,7 @@ export type LessonHistoryRow = {
   id: string;
   courseName: string;
   lessonTitle: string;
+  lessonDescription: string | null;
   entryDate: string;
   mark: number | null;
   feedback: string | null;
@@ -41,7 +42,14 @@ export function LessonHistoryTable({ rows }: { rows: LessonHistoryRow[] }) {
                 {new Date(row.entryDate).toLocaleDateString()}
               </TableCell>
               <TableCell className="font-medium">{row.courseName}</TableCell>
-              <TableCell>{row.lessonTitle}</TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span>{row.lessonTitle}</span>
+                  {row.lessonDescription && (
+                    <span className="text-xs text-muted-foreground">{row.lessonDescription}</span>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>{row.mark != null ? row.mark : "—"}</TableCell>
               <TableCell className="text-muted-foreground">{row.feedback ?? "—"}</TableCell>
             </TableRow>

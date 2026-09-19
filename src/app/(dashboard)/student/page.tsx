@@ -12,7 +12,7 @@ export default async function StudentDashboardPage() {
   const [{ data: records }, { count: courseCount }] = await Promise.all([
     supabase
       .from("lesson_records")
-      .select("id, entry_date, mark, feedback, lessons(title), courses(name)")
+      .select("id, entry_date, mark, feedback, lesson_id, recorded_by, lessons(title), courses(name)")
       .eq("student_id", profile!.id)
       .order("entry_date", { ascending: true }),
     supabase
@@ -43,6 +43,17 @@ export default async function StudentDashboardPage() {
   }
 
   const recentFeedback = [...rows].reverse().find((r) => r.feedback);
+
+  let recentFeedbackLessonTitle = recentFeedback?.lessons?.title ?? null;
+  if (recentFeedback?.recorded_by) {
+    const { data: override } = await supabase
+      .from("lesson_teacher_overrides")
+      .select("title")
+      .eq("lesson_id", recentFeedback.lesson_id)
+      .eq("teacher_id", recentFeedback.recorded_by)
+      .maybeSingle();
+    recentFeedbackLessonTitle = override?.title ?? recentFeedbackLessonTitle;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,7 +100,7 @@ export default async function StudentDashboardPage() {
           {recentFeedback && recentFeedback.feedback ? (
             <div className="flex flex-col gap-1 text-sm">
               <p className="text-muted-foreground">
-                {recentFeedback.courses?.name} · {recentFeedback.lessons?.title} ·{" "}
+                {recentFeedback.courses?.name} · {recentFeedbackLessonTitle} ·{" "}
                 {new Date(recentFeedback.entry_date).toLocaleDateString()}
               </p>
               <p>{recentFeedback.feedback}</p>
