@@ -12,14 +12,39 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const fullName = String(body.fullName ?? "").trim();
-  const email = String(body.email ?? "").trim();
+  const email = String(body.email ?? "").trim().toLowerCase();
   const role = body.role as UserRole;
+  const method = body.method === "pending" ? "pending" : "invite";
 
   if (!fullName || !email || (role !== "teacher" && role !== "student")) {
     return NextResponse.json({ error: "Missing or invalid fields." }, { status: 400 });
   }
 
   const adminClient = createAdminClient();
+
+  if (method === "pending") {
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json({ error: "An account with that email already exists." }, { status: 400 });
+    }
+
+    const { error } = await adminClient
+      .from("pending_signups")
+      .insert({ email, full_name: fullName, role, created_by: profile.id });
+
+    if (error) {
+      const message = error.code === "23505" ? "That email is already awaiting signup." : error.message;
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    return NextResponse.json({ pending: true });
+  }
+
   const { origin } = new URL(request.url);
 
   try {

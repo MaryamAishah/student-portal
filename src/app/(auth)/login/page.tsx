@@ -73,6 +73,13 @@ export default async function LoginPage({
         </div>
 
         <GoogleSignInButton />
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          New here?{" "}
+          <Link href="/signup" className="text-primary underline-offset-4 hover:underline">
+            Create your account
+          </Link>
+        </p>
       </CardContent>
     </Card>
   );

@@ -19,9 +19,10 @@ export function CreateUserForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"teacher" | "student">("student");
+  const [method, setMethod] = useState<"invite" | "pending">("invite");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+  const [done, setDone] = useState<{ email: string; method: "invite" | "pending" } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +32,7 @@ export function CreateUserForm() {
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fullName, email, role }),
+      body: JSON.stringify({ fullName, email, role, method }),
     });
     const data = await res.json();
 
@@ -42,25 +43,33 @@ export function CreateUserForm() {
       return;
     }
 
-    setInvitedEmail(email);
+    setDone({ email, method });
     setFullName("");
     setEmail("");
     router.refresh();
   }
 
-  if (invitedEmail) {
+  if (done) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Invitation sent</CardTitle>
+          <CardTitle>{done.method === "invite" ? "Invitation sent" : "Account added"}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm">
-          <p>
-            An email has been sent to <span className="font-medium">{invitedEmail}</span> with a
-            link to set their password and log in. No action is needed from you.
-          </p>
-          <Button variant="outline" onClick={() => setInvitedEmail(null)}>
-            Invite another account
+          {done.method === "invite" ? (
+            <p>
+              An email has been sent to <span className="font-medium">{done.email}</span> with a
+              link to set their password and log in. No action is needed from you.
+            </p>
+          ) : (
+            <p>
+              <span className="font-medium">{done.email}</span> can now visit the signup link and
+              set their own password to activate their account. Share the link from the Users
+              page.
+            </p>
+          )}
+          <Button variant="outline" onClick={() => setDone(null)}>
+            Add another account
           </Button>
         </CardContent>
       </Card>
@@ -112,9 +121,35 @@ export function CreateUserForm() {
               </SelectContent>
             </Select>
           </div>
+          <div className="flex flex-col gap-2">
+            <Label>How will they activate this account?</Label>
+            <div className="inline-flex w-fit rounded-lg border p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={method === "invite" ? "default" : "ghost"}
+                onClick={() => setMethod("invite")}
+              >
+                Email invite
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={method === "pending" ? "default" : "ghost"}
+                onClick={() => setMethod("pending")}
+              >
+                Self-serve link
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {method === "invite"
+                ? "We'll email them a link to set their password."
+                : "No email is sent — share the signup link from the Users page and they'll set their own password there."}
+            </p>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={pending}>
-            {pending ? "Sending invite…" : "Send invite"}
+            {pending ? "Saving…" : method === "invite" ? "Send invite" : "Add account"}
           </Button>
         </form>
       </CardContent>

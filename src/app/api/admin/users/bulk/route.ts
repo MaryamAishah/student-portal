@@ -10,7 +10,7 @@ const MAX_ROWS = 300;
 type ResultRow = {
   email: string;
   fullName: string;
-  status: "invited" | "error";
+  status: "invited" | "pending" | "error";
   message?: string;
 };
 
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   const role = body.role as UserRole;
   const rows = Array.isArray(body.rows) ? body.rows : [];
   const courseId = typeof body.courseId === "string" && body.courseId ? body.courseId : null;
+  const method = body.method === "pending" ? "pending" : "invite";
 
   if (role !== "teacher" && role !== "student") {
     return NextResponse.json({ error: "Invalid role." }, { status: 400 });
@@ -90,6 +91,42 @@ export async function POST(request: Request) {
       }
     }
 
+    if (method === "pending") {
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingProfile) {
+        results.push({ email, fullName, status: "error", message: "Already has an account." });
+        continue;
+      }
+
+      const { error } = await adminClient.from("pending_signups").insert({
+        email,
+        full_name: fullName,
+        role,
+        created_by: profile.id,
+        course_id: groupId && courseId ? courseId : null,
+        group_id: groupId,
+      });
+
+      if (error) {
+        const message = error.code === "23505" ? "Already awaiting signup." : error.message;
+        results.push({ email, fullName, status: "error", message });
+        continue;
+      }
+
+      results.push({
+        email,
+        fullName,
+        status: "pending",
+        message: groupId ? `Will enroll in "${groupName}" once they sign up.` : undefined,
+      });
+      continue;
+    }
+
     const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName, role },
       redirectTo: `${origin}/reset-password`,
@@ -122,7 +159,7 @@ export async function POST(request: Request) {
     results.push({ email, fullName, status: "invited" });
   }
 
-  const invited = results.filter((r) => r.status === "invited").length;
+  const succeeded = results.filter((r) => r.status !== "error").length;
 
-  return NextResponse.json({ results, invited, failed: results.length - invited });
+  return NextResponse.json({ results, invited: succeeded, failed: results.length - succeeded });
 }

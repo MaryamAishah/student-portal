@@ -26,7 +26,7 @@ import {
 type ResultRow = {
   email: string;
   fullName: string;
-  status: "invited" | "error";
+  status: "invited" | "pending" | "error";
   message?: string;
 };
 
@@ -34,6 +34,7 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState<"teacher" | "student">("student");
+  const [method, setMethod] = useState<"invite" | "pending">("invite");
   const [courseId, setCourseId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedInviteRow[]>([]);
@@ -78,6 +79,7 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         role,
+        method,
         rows: validRows,
         courseId: role === "student" ? courseId : null,
       }),
@@ -95,11 +97,12 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
   }
 
   if (results) {
-    const invited = results.filter((r) => r.status === "invited").length;
+    const succeeded = results.filter((r) => r.status !== "error").length;
     return (
       <div className="flex flex-col gap-4">
         <p className="text-sm">
-          Invited <span className="font-medium">{invited}</span> of{" "}
+          {method === "invite" ? "Invited" : "Added"}{" "}
+          <span className="font-medium">{succeeded}</span> of{" "}
           <span className="font-medium">{results.length}</span> accounts.
         </p>
         <Table>
@@ -119,6 +122,10 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
                   {r.status === "invited" ? (
                     <Badge variant="secondary" title={r.message}>
                       {r.message ? "Invited & enrolled" : "Invited"}
+                    </Badge>
+                  ) : r.status === "pending" ? (
+                    <Badge variant="secondary" title={r.message}>
+                      {r.message ? "Awaiting signup & will enroll" : "Awaiting signup"}
                     </Badge>
                   ) : (
                     <Badge variant="destructive" title={r.message}>
@@ -161,6 +168,33 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
         </div>
         <p className="text-xs text-muted-foreground">
           Every account in this file will be created as this role.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>How will they activate their account?</Label>
+        <div className="inline-flex w-fit rounded-lg border p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={method === "invite" ? "default" : "ghost"}
+            onClick={() => setMethod("invite")}
+          >
+            Email invite
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={method === "pending" ? "default" : "ghost"}
+            onClick={() => setMethod("pending")}
+          >
+            Self-serve link
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {method === "invite"
+            ? "Each person gets an individual email with a link to set their password."
+            : "No emails are sent — share the signup link from the Users page and everyone sets their own password there."}
         </p>
       </div>
 
@@ -248,7 +282,11 @@ export function BulkInviteForm({ courses }: { courses: { id: string; name: strin
         onClick={handleSubmit}
         className="self-start"
       >
-        {pending ? "Sending invites…" : `Invite ${validRows.length || ""} account${validRows.length === 1 ? "" : "s"}`}
+        {pending
+          ? "Saving…"
+          : method === "invite"
+            ? `Invite ${validRows.length || ""} account${validRows.length === 1 ? "" : "s"}`
+            : `Add ${validRows.length || ""} account${validRows.length === 1 ? "" : "s"}`}
       </Button>
     </div>
   );

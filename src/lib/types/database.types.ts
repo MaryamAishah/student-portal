@@ -249,6 +249,52 @@ export type Database = {
           },
         ];
       };
+      pending_signups: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          course_id: string | null;
+          group_id: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          course_id?: string | null;
+          group_id?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["pending_signups"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "pending_signups_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_signups_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "course_groups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pending_signups_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {

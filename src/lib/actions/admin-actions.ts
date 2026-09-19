@@ -287,3 +287,10 @@ export async function deleteCourseAction(courseId: string) {
   await supabase.from("courses").delete().eq("id", courseId);
   revalidatePath("/admin/courses");
 }
+
+export async function cancelPendingSignupAction(pendingId: string) {
+  await requireRole("admin");
+  const supabase = await createClient();
+  await supabase.from("pending_signups").delete().eq("id", pendingId);
+  revalidatePath("/admin/users");
+}
