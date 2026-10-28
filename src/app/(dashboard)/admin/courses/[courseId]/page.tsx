@@ -9,6 +9,8 @@ import { BulkLessonUpload } from "@/components/admin/bulk-lesson-upload";
 import { GroupForm } from "@/components/admin/group-form";
 import { CourseActions } from "@/components/admin/course-actions";
 import { EmptyState } from "@/components/shared/empty-state";
+import { buttonVariants } from "@/components/ui/button";
+import { DownloadIcon } from "lucide-react";
 
 export default async function CourseDetailPage({
   params,
@@ -78,7 +80,17 @@ export default async function CourseDetailPage({
           <h1 className="text-2xl font-semibold">{course.name}</h1>
           {course.description && <p className="text-sm text-muted-foreground">{course.description}</p>}
         </div>
-        <CourseActions course={course} />
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/admin/courses/${courseId}/feedback-export`}
+            download
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <DownloadIcon />
+            Download all feedback
+          </a>
+          <CourseActions course={course} />
+        </div>
       </div>
 
       <Tabs defaultValue="lessons">
