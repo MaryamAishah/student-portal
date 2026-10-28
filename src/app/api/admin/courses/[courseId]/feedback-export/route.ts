@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
+import ExcelJS from "exceljs";
 import { getSessionProfile } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
-import { toCsv } from "@/lib/csv";
 
 // Supabase caps each select at 1000 rows by default, so a whole course's
 // records are fetched page by page.
 const PAGE_SIZE = 1000;
+
+// Scoring key shown above the table, matching the academy's own sheets.
+const ATTENDANCE_KEY: [string, number][] = [
+  ["Present on time", 10],
+  ["Present late", 8],
+  ["Left early", 8],
+  ["Make up", 7],
+  ["Absent", 0],
+];
+const HEADER_ROW = ATTENDANCE_KEY.length + 2;
+const FIXED_COLUMNS = ["Full Name", "Email", "Phone Number"];
+const NOT_ENROLLED = "(not enrolled)";
 
 type RecordRow = {
   lesson_id: string;
@@ -14,6 +26,18 @@ type RecordRow = {
   mark: number | null;
   feedback: string | null;
 };
+
+// Excel sheet names: max 31 chars, no []:*?/\ and unique per workbook.
+function sheetName(name: string, used: Set<string>): string {
+  const base = (name.replace(/[[\]:*?/\\]/g, " ").trim() || "Group").slice(0, 31);
+  let candidate = base;
+  for (let n = 2; used.has(candidate.toLowerCase()); n++) {
+    const suffix = ` (${n})`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+}
 
 export async function GET(_request: Request, { params }: { params: Promise<{ courseId: string }> }) {
   const sessionProfile = await getSessionProfile();
@@ -51,22 +75,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cou
       .select("id, title")
       .eq("course_id", courseId)
       .order("sort_order", { ascending: true }),
-    supabase.from("course_groups").select("id, name").eq("course_id", courseId),
+    supabase.from("course_groups").select("id, name").eq("course_id", courseId).order("name"),
     supabase.from("enrollments").select("student_id, group_id").eq("course_id", courseId),
   ]);
 
-  // Every enrolled student gets rows, plus anyone with records who has
+  // Every enrolled student gets a row, plus anyone with records who has
   // since been unenrolled.
   const studentIds = [
     ...new Set([...(enrollments ?? []).map((e) => e.student_id), ...records.map((r) => r.student_id)]),
   ];
-  const nameById = new Map<string, string>();
+  const profileById = new Map<string, { full_name: string; email: string | null }>();
   for (let i = 0; i < studentIds.length; i += 200) {
     const { data: people } = await supabase
       .from("profiles")
-      .select("id, full_name")
+      .select("id, full_name, email")
       .in("id", studentIds.slice(i, i + 200));
-    for (const p of people ?? []) nameById.set(p.id, p.full_name);
+    for (const p of people ?? []) profileById.set(p.id, p);
   }
 
   const groupNameById = new Map((groups ?? []).map((g) => [g.id, g.name]));
@@ -84,47 +108,100 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cou
     entriesByCell.set(key, list);
   }
 
-  function cell(entries: RecordRow[], value: (r: RecordRow) => string): string {
-    const filled = entries.filter((r) => value(r) !== "");
-    if (filled.length <= 1) return filled[0] ? value(filled[0]) : "";
-    return filled.map((r) => `${r.entry_date}: ${value(r)}`).join("\n");
-  }
-
   const students = studentIds
     .map((id) => ({
       id,
-      name: nameById.get(id) ?? "",
-      group: groupNameByStudent.get(id) || "(not enrolled)",
+      name: profileById.get(id)?.full_name ?? "",
+      email: profileById.get(id)?.email ?? "",
+      group: groupNameByStudent.get(id) || NOT_ENROLLED,
     }))
-    .sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const lessonList = lessons ?? [];
-  const table: string[][] = [["Teacher (group)", "Student", "", ...lessonList.map((l) => l.title)]];
-  for (const s of students) {
-    const entriesFor = (lessonId: string) => entriesByCell.get(`${s.id}:${lessonId}`) ?? [];
-    table.push([
-      s.group,
-      s.name,
-      "Mark",
-      ...lessonList.map((l) => cell(entriesFor(l.id), (r) => (r.mark != null ? String(r.mark) : ""))),
-    ]);
-    table.push([
-      s.group,
-      s.name,
-      "Feedback",
-      ...lessonList.map((l) => cell(entriesFor(l.id), (r) => r.feedback?.trim() ?? "")),
-    ]);
+  const lessonCol = (index: number) => FIXED_COLUMNS.length + 1 + index * 2;
+  const totalCol = lessonCol(lessonList.length);
+
+  // One tab per group (i.e. per teacher), with any unenrolled students last.
+  const workbook = new ExcelJS.Workbook();
+  const usedSheetNames = new Set<string>();
+
+  for (const groupName of [...(groups ?? []).map((g) => g.name), NOT_ENROLLED]) {
+    const groupStudents = students.filter((s) => s.group === groupName);
+    if (groupName === NOT_ENROLLED && groupStudents.length === 0) continue;
+
+    const sheet = workbook.addWorksheet(sheetName(groupName, usedSheetNames), {
+      views: [{ state: "frozen", xSplit: 1, ySplit: HEADER_ROW + 1 }],
+    });
+
+    ATTENDANCE_KEY.forEach(([label, score], i) => {
+      sheet.getCell(i + 1, 2).value = label;
+      sheet.getCell(i + 1, 3).value = score;
+    });
+
+    const headerRow = sheet.getRow(HEADER_ROW);
+    const lessonRow = sheet.getRow(HEADER_ROW + 1);
+    FIXED_COLUMNS.forEach((label, i) => (headerRow.getCell(i + 1).value = label));
+    lessonList.forEach((lesson, i) => {
+      const col = lessonCol(i);
+      headerRow.getCell(col).value = "Attendance";
+      headerRow.getCell(col + 1).value = "Performance";
+      lessonRow.getCell(col).value = lesson.title;
+      sheet.mergeCells(HEADER_ROW + 1, col, HEADER_ROW + 1, col + 1);
+    });
+    headerRow.getCell(totalCol).value = "Total";
+    for (const row of [headerRow, lessonRow]) {
+      row.font = { bold: true };
+      row.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    }
+
+    groupStudents.forEach((s, i) => {
+      const row = sheet.getRow(HEADER_ROW + 2 + i);
+      row.getCell(1).value = s.name;
+      row.getCell(2).value = s.email;
+      let total = 0;
+      lessonList.forEach((lesson, j) => {
+        const col = lessonCol(j);
+        const entries = entriesByCell.get(`${s.id}:${lesson.id}`) ?? [];
+        const marked = entries.filter((r) => r.mark != null);
+        const withFeedback = entries.filter((r) => r.feedback?.trim());
+        for (const r of marked) total += Number(r.mark);
+
+        row.getCell(col).value =
+          marked.length === 1
+            ? Number(marked[0].mark)
+            : marked.map((r) => `${r.entry_date}: ${r.mark}`).join("\n") || null;
+        row.getCell(col + 1).value =
+          withFeedback.length === 1
+            ? withFeedback[0].feedback!.trim()
+            : withFeedback.map((r) => `${r.entry_date}: ${r.feedback!.trim()}`).join("\n") || null;
+      });
+      row.getCell(totalCol).value = total;
+    });
+
+    sheet.getColumn(1).width = 24;
+    sheet.getColumn(2).width = 28;
+    sheet.getColumn(3).width = 16;
+    lessonList.forEach((_, j) => {
+      sheet.getColumn(lessonCol(j)).width = 12;
+      sheet.getColumn(lessonCol(j) + 1).width = 50;
+    });
+    sheet.getColumn(totalCol).width = 10;
+
+    for (let r = HEADER_ROW + 2; r < HEADER_ROW + 2 + groupStudents.length; r++) {
+      sheet.getRow(r).eachCell({ includeEmpty: true }, (cell, col) => {
+        const centered = col === totalCol || (col > FIXED_COLUMNS.length && (col - FIXED_COLUMNS.length) % 2 === 1);
+        cell.alignment = { vertical: "top", wrapText: true, horizontal: centered ? "center" : "left" };
+      });
+    }
   }
 
-  const csv = toCsv(table);
-
-  const filename = `${course.name}-feedback.csv`;
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = `${course.name}-feedback.xlsx`;
   const asciiFilename = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
 
-  // Leading BOM so Excel opens the file as UTF-8.
-  return new Response("\uFEFF" + csv, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "no-store",
     },
